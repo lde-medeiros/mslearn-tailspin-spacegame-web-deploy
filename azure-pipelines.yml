@@ -14,7 +14,7 @@ stages:
 # Build stage (self-hosted)
 # ==========================
 - stage: 'Build'
-  displayName: 'Build on self-hosted agent'
+  displayName: 'Build on self-hosted WSL agent'
   jobs:
   - job: 'Build_SelfHosted'
     displayName: 'Build job (SelfHostedPRO690)'
@@ -28,43 +28,59 @@ stages:
       dotnetSdkVersion: '8.x'
 
     steps:
+    # .NET SDK for build on self-hosted agent
     - task: UseDotNet@2
       displayName: 'Use .NET SDK $(dotnetSdkVersion) on self-hosted agent'
       inputs:
         version: '$(dotnetSdkVersion)'
 
-    - task: NodeTool@0
+    # New Node task (UseNodeV1 instead of deprecated NodeTool@0)
+    - task: UseNode@1
       displayName: 'Use Node 18.x on self-hosted agent'
       inputs:
-        versionSpec: '18.x'
+        version: '18.x'
+        checkLatest: true
 
+    # npm install to get local node_modules (including gulp, node-sass etc.)
     - task: Npm@1
       displayName: 'Run npm install'
       inputs:
         verbose: false
 
+    # Compile Sass assets
     - script: './node_modules/.bin/node-sass $(wwwrootDir) --output $(wwwrootDir)'
       displayName: 'Compile Sass assets'
 
-    - task: gulp@1
+    # Run gulp using local gulp (after npm install)
+    - script: 'npx gulp'
       displayName: 'Run gulp tasks on self-hosted agent'
 
+    # Write build info
     - script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
       displayName: 'Write build info'
       workingDirectory: $(wwwrootDir)
 
+    # Explicit NuGet restore using dotnet CLI to avoid NETSDK1004
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore project dependencies (Tailspin web)'
+      inputs:
+        command: 'restore'
+        projects: 'Tailspin.SpaceGame.Web/Tailspin.SpaceGame.Web.csproj'
+
+    # Build using restored packages
     - task: DotNetCoreCLI@2
       displayName: 'Build the project - $(buildConfiguration)'
       inputs:
         command: 'build'
         arguments: '--no-restore --configuration $(buildConfiguration)'
-        projects: '**/*.csproj'
+        projects: 'Tailspin.SpaceGame.Web/Tailspin.SpaceGame.Web.csproj'
 
+    # Publish output for deployment
     - task: DotNetCoreCLI@2
       displayName: 'Publish the project - $(buildConfiguration)'
       inputs:
         command: 'publish'
-        projects: '**/*.csproj'
+        projects: 'Tailspin.SpaceGame.Web/Tailspin.SpaceGame.Web.csproj'
         publishWebProjects: false
         arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
         zipAfterPublish: true
@@ -76,7 +92,7 @@ stages:
 # Test stage (self-hosted)
 # ==========================
 - stage: 'Test'
-  displayName: 'Test on self-hosted agent'
+  displayName: 'Test on self-hosted WSL agent'
   dependsOn: Build
   condition: succeeded()
   jobs:
@@ -86,6 +102,7 @@ stages:
       name: 'SelfHostedPRO690'
 
     steps:
+    # Ensure .NET SDK available for tests
     - task: UseDotNet@2
       displayName: 'Use .NET SDK 8.x for tests on self-hosted agent'
       inputs:
