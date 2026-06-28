@@ -1,3 +1,7 @@
+# PRO690-Multistage-SelfHosted-and-Hosted.yaml
+
+name: PRO690-Multistage-SelfHosted-and-Hosted
+
 trigger:
 - '*'
 
@@ -6,13 +10,16 @@ variables:
   releaseBranchName: 'release'
 
 stages:
+# ==========================
+# Build stage (self-hosted)
+# ==========================
 - stage: 'Build'
   displayName: 'Build the web application'
-  jobs: 
+  jobs:
   - job: 'Build'
     displayName: 'Build job'
     pool:
-      vmImage: 'ubuntu-22.04'
+      name: 'SelfHostedPRO690'
       demands:
       - npm
 
@@ -25,11 +32,12 @@ stages:
       displayName: 'Use .NET SDK $(dotnetSdkVersion)'
       inputs:
         version: '$(dotnetSdkVersion)'
-        
+
     - task: NodeTool@0
       displayName: 'Use Node 18.x'
       inputs:
         versionSpec: '18.x'
+
     - task: Npm@1
       displayName: 'Run npm install'
       inputs:
@@ -70,10 +78,36 @@ stages:
     - publish: '$(Build.ArtifactStagingDirectory)'
       artifact: drop
 
+# ==========================
+# Test stage (self-hosted)
+# ==========================
+- stage: 'Test'
+  displayName: 'Run tests on self-hosted agent'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: 'Test'
+    displayName: 'Test job'
+    pool:
+      name: 'SelfHostedPRO690'
+
+    steps:
+    - download: current
+      artifact: drop
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Run unit tests'
+      inputs:
+        command: 'test'
+        projects: '**/*Tests.csproj'
+
+# ==========================
+# Dev stage (Microsoft-hosted)
+# ==========================
 - stage: 'Dev'
   displayName: 'Deploy to the dev environment'
-  dependsOn: Build
-  condition:  succeeded()
+  dependsOn: Test
+  condition: succeeded()
   jobs:
   - deployment: Deploy
     pool:
@@ -87,6 +121,7 @@ stages:
           steps:
           - download: current
             artifact: drop
+
           - task: AzureWebApp@1
             displayName: 'Azure App Service Deploy: dev website'
             inputs:
