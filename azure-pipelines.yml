@@ -14,10 +14,10 @@ stages:
 # Build stage (self-hosted)
 # ==========================
 - stage: 'Build'
-  displayName: 'Build the web application'
+  displayName: 'Build on self-hosted agent'
   jobs:
-  - job: 'Build'
-    displayName: 'Build job'
+  - job: 'Build_SelfHosted'
+    displayName: 'Build job (SelfHostedPRO690)'
     pool:
       name: 'SelfHostedPRO690'
       demands:
@@ -29,12 +29,12 @@ stages:
 
     steps:
     - task: UseDotNet@2
-      displayName: 'Use .NET SDK $(dotnetSdkVersion)'
+      displayName: 'Use .NET SDK $(dotnetSdkVersion) on self-hosted agent'
       inputs:
         version: '$(dotnetSdkVersion)'
 
     - task: NodeTool@0
-      displayName: 'Use Node 18.x'
+      displayName: 'Use Node 18.x on self-hosted agent'
       inputs:
         versionSpec: '18.x'
 
@@ -47,17 +47,11 @@ stages:
       displayName: 'Compile Sass assets'
 
     - task: gulp@1
-      displayName: 'Run gulp tasks'
+      displayName: 'Run gulp tasks on self-hosted agent'
 
     - script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
       displayName: 'Write build info'
       workingDirectory: $(wwwrootDir)
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Restore project dependencies'
-      inputs:
-        command: 'restore'
-        projects: '**/*.csproj'
 
     - task: DotNetCoreCLI@2
       displayName: 'Build the project - $(buildConfiguration)'
@@ -82,16 +76,21 @@ stages:
 # Test stage (self-hosted)
 # ==========================
 - stage: 'Test'
-  displayName: 'Run tests on self-hosted agent'
+  displayName: 'Test on self-hosted agent'
   dependsOn: Build
   condition: succeeded()
   jobs:
-  - job: 'Test'
-    displayName: 'Test job'
+  - job: 'Test_SelfHosted'
+    displayName: 'Test job (SelfHostedPRO690)'
     pool:
       name: 'SelfHostedPRO690'
 
     steps:
+    - task: UseDotNet@2
+      displayName: 'Use .NET SDK 8.x for tests on self-hosted agent'
+      inputs:
+        version: '8.x'
+
     - download: current
       artifact: drop
 
@@ -105,11 +104,12 @@ stages:
 # Dev stage (Microsoft-hosted)
 # ==========================
 - stage: 'Dev'
-  displayName: 'Deploy to the dev environment'
+  displayName: 'Deploy to dev on Microsoft-hosted agent'
   dependsOn: Test
   condition: succeeded()
   jobs:
-  - deployment: Deploy
+  - deployment: Deploy_Dev_Hosted
+    displayName: 'Dev deploy job (Microsoft-hosted Ubuntu)'
     pool:
       vmImage: 'ubuntu-22.04'
     environment: dev
@@ -123,7 +123,7 @@ stages:
             artifact: drop
 
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: dev website'
+            displayName: 'Azure App Service Deploy: dev website (hosted agent)'
             inputs:
               azureSubscription: 'Azure-for-Students-Lucas'
               appType: 'webAppLinux'
