@@ -1,0 +1,17 @@
+# PRO690-HostedAgent-Demo.yaml
+
+name: PRO690-HostedAgent-Demo
+
+trigger:
+- main    
+
+pool:
+  name: 'Azure Pipelines'             # Microsoft-hosted pool
+  vmImage: 'ubuntu-22.04'   # hosted Ubuntu image
+
+steps:
+- script: |
+    echo "PRO690 hosted-agent demo running on Ubuntu 22.04"
+    echo "Agent pool: PRO690 (Microsoft-hosted)"
+    uname -a
+  displayName: 'Test Microsoft-hosted agent in PRO690'
