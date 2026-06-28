@@ -1,0 +1,21 @@
+# PRO690-SelfHostedAgent-Demo.yaml
+
+name: PRO690-SelfHostedAgent-Demo
+
+trigger:
+- main    
+
+pool:
+  name: 'SelfHostedPRO690'
+
+jobs:
+- job: LongRunningDemo
+  timeoutInMinutes: 5          # job can run up to 5 minutes
+  steps:
+  - script: |
+      echo "Starting Self hosted-agent demo..."
+      uname -a
+      echo "Sleeping for 40 seconds so we can watch the agent state..."
+      sleep 40
+      echo "Demo complete."
+    displayName: 'Keep agent busy for 40 seconds'
